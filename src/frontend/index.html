@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>智能菜谱推荐</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-left">
+      <span class="logo">🍽️ 智能菜谱推荐</span>
+      <div class="nav-links">
+        <a class="nav-link active" data-view="home" id="navHome">首页</a>
+        <a class="nav-link" data-view="history" id="navHistory">📋 历史记录</a>
+      </div>
+    </div>
+    <div class="nav-right">
+      <span class="username" id="usernameDisplay"></span>
+      <button class="btn-logout" id="logoutBtn">退出</button>
+    </div>
+  </nav>
+
+  <div class="modal-overlay" id="modalOverlay" style="display:none;">
+    <div class="modal-dialog" id="modalDialog">
+      <button class="modal-close" id="modalClose">&times;</button>
+      <div id="modalBody">
+        <div id="modalLoading" class="modal-loading">加载中...</div>
+        <div id="modalContent" style="display:none;">
+          <h2 id="recipeName" class="recipe-detail-title"></h2>
+          <div class="recipe-tags" id="recipeTags"></div>
+          <div class="recipe-meta" id="recipeMeta"></div>
+
+          <h3 class="section-title">食材</h3>
+          <ul class="ingredient-list" id="ingredientList"></ul>
+
+          <h3 class="section-title">步骤</h3>
+          <ol class="step-list" id="stepList"></ol>
+
+          <h3 class="section-title">用户评价</h3>
+          <div class="feedback-form" id="feedbackForm">
+            <div class="star-rating" id="starRating">
+              <span class="star" data-value="1">★</span>
+              <span class="star" data-value="2">★</span>
+              <span class="star" data-value="3">★</span>
+              <span class="star" data-value="4">★</span>
+              <span class="star" data-value="5">★</span>
+            </div>
+            <textarea class="feedback-textarea" id="feedbackComment" placeholder="写下你的评价..." rows="3"></textarea>
+            <button class="btn-submit-feedback" id="submitFeedback">提交评价</button>
+            <p class="feedback-login-hint" id="feedbackLoginHint" style="display:none;">请先登录后再评价</p>
+          </div>
+          <div class="feedback-list" id="feedbackList"></div>
+
+          <div class="modal-actions">
+            <button class="btn-random-switch" id="randomSwitchBtn">🎲 换一道</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <main class="container">
+    <section class="recommend-header">
+      <h1>今日推荐</h1>
+      <p class="date" id="dateDisplay"></p>
+      <div class="header-actions">
+        <button class="btn-primary" id="fetchRecommendBtn">获取今日推荐</button>
+        <button class="btn-random" id="randomExploreBtn">🎲 随便吃点</button>
+      </div>
+    </section>
+
+    <section class="ingredient-search">
+      <h2 class="ingredient-search-title">🔍 基于食材推荐</h2>
+      <div class="ingredient-search-box">
+        <input type="text" class="ingredient-input" id="ingredientInput" placeholder="输入食材，用逗号分隔，如：番茄,鸡蛋" />
+        <button class="btn-primary" id="ingredientSearchBtn">搜索</button>
+      </div>
+    </section>
+
+    <section class="loading" id="loadingIndicator" style="display: none;">
+      <div class="spinner"></div>
+      <p>正在为你智能推荐菜谱...</p>
+    </section>
+
+    <section class="error" id="errorDisplay" style="display: none;">
+      <p id="errorMessage"></p>
+    </section>
+
+    <section class="card-grid" id="cardGrid"></section>
+
+    <section class="history-section" id="historySection" style="display:none;">
+      <h1 class="history-title">📋 我的历史记录</h1>
+      <div id="historyLoading" class="loading" style="display:none;">
+        <div class="spinner"></div>
+        <p>加载中...</p>
+      </div>
+      <div id="historyContent"></div>
+    </section>
+  </main>
+
+  <script>
+    if (!localStorage.getItem('token')) {
+      window.location.href = 'login.html';
+    }
+  </script>
+  <script src="app.js"></script>
+</body>
+</html>
