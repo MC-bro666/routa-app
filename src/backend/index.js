@@ -1,11 +1,13 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 
 const authRoutes = require('./routes/auth');
 const preferencesRoutes = require('./routes/preferences');
 const recommendRoutes = require('./routes/recommend');
 const recipesRoutes = require('./routes/recipes');
+const feedbackRoutes = require('./routes/feedback');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -13,10 +15,13 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+app.use(express.static(path.join(__dirname, '..', 'frontend')));
+
 app.use('/api', authRoutes);
 app.use('/api', preferencesRoutes);
 app.use('/api', recommendRoutes);
 app.use('/api', recipesRoutes);
+app.use('/api', feedbackRoutes);
 
 app.use((err, req, res, next) => {
     console.error(err.stack);
