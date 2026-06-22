@@ -186,4 +186,27 @@ router.post('/recommend/by-ingredients', (req, res) => {
     }
 });
 
+router.get('/recommend/history/:userId', (req, res) => {
+    try {
+        const { userId } = req.params;
+        const days = parseInt(req.query.days, 10) || 30;
+
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - days);
+        const cutoffStr = cutoff.toISOString().split('T')[0];
+
+        const rows = db.prepare(
+            `SELECT rh.id, rh.recipe_id, rh.recommend_date, rh.is_adopted, r.name AS recipe_name
+             FROM recommend_history rh
+             JOIN recipes r ON r.id = rh.recipe_id
+             WHERE rh.user_id = ? AND rh.recommend_date >= ?
+             ORDER BY rh.recommend_date DESC, rh.id DESC`
+        ).all(userId, cutoffStr);
+
+        res.json({ records: rows });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;
