@@ -1,212 +1,238 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db');
+const sqlite3 = require('sqlite3');
 
-function calcBmr(user) {
-    if (user.gender === 'male') {
-        return 10 * user.weight + 6.25 * user.height - 5 * user.age + 5;
-    }
-    return 10 * user.weight + 6.25 * user.height - 5 * user.age - 161;
-}
+// ✅ 直接创建数据库连接
+const db = new sqlite3.Database('src/database/recipe.db');
 
-function getCalorieFactor(activityLevel) {
-    const multipliers = { low: 1.2, medium: 1.4, high: 1.6 };
-    return multipliers[activityLevel] || 1.2;
-}
-
+// ============================================================
+// GET /api/recommend/daily/:userId - 每日推荐
+// ============================================================
 router.get('/recommend/daily/:userId', (req, res) => {
-    try {
-        const { userId } = req.params;
+    const userId = parseInt(req.params.userId);
+    console.log('🔥 /recommend/daily 被调用，userId:', userId);
 
-        const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        const bmr = calcBmr(user);
-        const factor = getCalorieFactor(user.activity_level);
-        const targetCalories = Math.round(bmr * factor);
-        const calorieMin = Math.round(targetCalories * 0.9);
-        const calorieMax = Math.round(targetCalories * 1.1);
-
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const dateStr = sevenDaysAgo.toISOString().split('T')[0];
-
-        const recentRows = db.prepare(
-            'SELECT recipe_id FROM recommend_history WHERE user_id = ? AND recommend_date >= ?'
-        ).all(userId, dateStr);
-        const excluded = new Set(recentRows.map(r => r.recipe_id));
-
-        const allRecipes = db.prepare(
-            `SELECT r.*, COALESCE(ROUND(SUM(i.calories * ri.quantity / 100.0), 0), 0) AS total_calories
-             FROM recipes r
-             LEFT JOIN recipe_ingredients ri ON ri.recipe_id = r.id
-             LEFT JOIN ingredients i ON i.id = ri.ingredient_id
-             GROUP BY r.id`
-        ).all();
-
-        let candidates = allRecipes.filter(r => !excluded.has(r.id));
-        if (candidates.length === 0) candidates = allRecipes;
-
-        let selected = [];
-        let used = new Set();
-
-        for (let attempt = 0; attempt < 50 && selected.length < 6; attempt++) {
-            selected = [];
-            used = new Set();
-            const shuffled = [...candidates].sort(() => Math.random() - 0.5).slice(0, 20);
-
-            if (shuffled.length === 0) break;
-            const first = shuffled.splice(Math.floor(Math.random() * shuffled.length), 1)[0];
-            selected.push(first);
-            used.add(first.id);
-
-            const remaining = shuffled.sort(() => Math.random() - 0.5);
-            for (const recipe of remaining) {
-                if (selected.length >= 6) break;
-                if (used.has(recipe.id)) continue;
-                const currentTotal = selected.reduce((s, r) => s + r.total_calories, 0) + recipe.total_calories;
-                if (currentTotal <= calorieMax || selected.length < 5) {
-                    selected.push(recipe);
-                    used.add(recipe.id);
-                }
-            }
-
-            if (selected.length < 6) {
-                for (const recipe of candidates) {
-                    if (selected.length >= 6) break;
-                    if (used.has(recipe.id)) continue;
-                    selected.push(recipe);
-                    used.add(recipe.id);
-                }
-            }
-
-            const total = selected.reduce((s, r) => s + r.total_calories, 0);
-            if (total >= calorieMin && total <= calorieMax) break;
-        }
-
-        const totalCalories = Math.round(selected.reduce((s, r) => s + r.total_calories, 0));
-
-        const today = new Date().toISOString().split('T')[0];
-        const insertHistory = db.prepare(
-            'INSERT INTO recommend_history (user_id, recipe_id, recommend_date) VALUES (?, ?, ?)'
-        );
-        for (const r of selected) {
-            insertHistory.run(userId, r.id, today);
-        }
-
-        res.json({
-            recommend_date: today,
-            summary: `今日推荐总热量约 ${totalCalories} kcal，目标 ${targetCalories} kcal（±10%），预估每日消耗约 ${Math.round(bmr * factor)} kcal`,
-            target_calories: targetCalories,
-            total_calories: totalCalories,
-            recipes: selected.map(r => ({
-                id: r.id,
-                name: r.name,
-                cuisine: r.cuisine,
-                flavor: r.flavor,
-                difficulty: r.difficulty,
-                duration: r.duration,
-                cost: r.cost,
-                season: r.season
-            }))
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+    if (isNaN(userId)) {
+        return res.status(400).json({ error: '无效的用户ID' });
     }
+
+    db.get(
+        `SELECT id, username, age, gender, height, weight, activity_level FROM users WHERE id = ?`,
+        [userId],
+        (err, user) => {
+            if (err) {
+                console.error('获取用户信息失败:', err);
+                return res.status(500).json({ error: '服务器错误: ' + err.message });
+            }
+            if (!user) {
+                return res.status(404).json({ error: '用户不存在' });
+            }
+
+            // 计算 BMR
+            let bmr;
+            const age = user.age || 25;
+            const height = user.height || 170;
+            const weight = user.weight || 65;
+            if (user.gender === 'female') {
+                bmr = 655.1 + 9.563 * weight + 1.85 * height - 4.676 * age;
+            } else {
+                bmr = 66.47 + 13.75 * weight + 5.003 * height - 6.755 * age;
+            }
+
+            const activityMap = { low: 1.2, medium: 1.4, high: 1.6 };
+            const factor = activityMap[user.activity_level] || 1.4;
+            const tdee = Math.round(bmr * factor);
+            const targetCalories = Math.round(tdee * 0.7);
+
+            // 获取7天内已吃的菜
+            db.all(
+                `SELECT DISTINCT recipe_id FROM recommend_history
+                 WHERE user_id = ? AND recommend_date >= date('now', '-7 days')`,
+                [userId],
+                (err, eaten) => {
+                    if (err) {
+                        console.error('获取历史记录失败:', err);
+                        return res.status(500).json({ error: '服务器错误' });
+                    }
+
+                    const eatenIds = eaten.map(row => row.recipe_id);
+
+                    db.all(
+                        `SELECT id, name, cuisine, flavor, difficulty, duration, cost, season, steps,
+                         (SELECT SUM(calories) FROM ingredients i
+                          JOIN recipe_ingredients ri ON i.id = ri.ingredient_id
+                          WHERE ri.recipe_id = recipes.id) as total_calories
+                         FROM recipes`,
+                        (err, recipes) => {
+                            if (err) {
+                                console.error('获取菜谱失败:', err);
+                                return res.status(500).json({ error: '服务器错误' });
+                            }
+
+                            let available = recipes.filter(r => !eatenIds.includes(r.id));
+                            available = available.map(r => {
+                                r.calories = r.total_calories || 300;
+                                return r;
+                            });
+
+                            const sorted = available.sort((a, b) => {
+                                return Math.abs(a.calories - targetCalories / 6) - Math.abs(b.calories - targetCalories / 6);
+                            });
+
+                            const selected = sorted.slice(0, 6);
+
+                            let totalCal = 0;
+                            selected.forEach(r => { totalCal += r.calories; });
+
+                            const result = {
+                                recommend_date: new Date().toISOString().split('T')[0],
+                                target_calories: targetCalories,
+                                actual_calories: totalCal,
+                                recipes: selected.map(r => ({
+                                    id: r.id,
+                                    name: r.name,
+                                    cuisine: r.cuisine,
+                                    flavor: r.flavor,
+                                    difficulty: r.difficulty,
+                                    duration: r.duration,
+                                    cost: r.cost,
+                                    season: r.season,
+                                    steps: r.steps ? r.steps.split(';') : [],
+                                    calories: r.calories
+                                }))
+                            };
+
+                            // 保存推荐历史
+                            const stmt = db.prepare(
+                                `INSERT INTO recommend_history (user_id, recipe_id, recommend_date, is_adopted)
+                                 VALUES (?, ?, date('now'), 0)`
+                            );
+                            selected.forEach(r => {
+                                stmt.run(userId, r.id);
+                            });
+                            stmt.finalize();
+
+                            res.json(result);
+                        }
+                    );
+                }
+            );
+        }
+    );
 });
 
+// ============================================================
+// GET /api/recommend/random - 随机探索
+// ============================================================
 router.get('/recommend/random', (req, res) => {
-    try {
-        const { cuisine } = req.query;
-        let where = '';
-        let params = [];
-        if (cuisine) {
-            where = 'WHERE cuisine = ?';
-            params.push(cuisine);
-        }
+    const cuisine = req.query.cuisine;
+    let sql = `SELECT id, name, cuisine, flavor, difficulty, duration, cost, season, steps FROM recipes`;
+    let params = [];
+    if (cuisine) {
+        sql += ` WHERE cuisine = ?`;
+        params.push(cuisine);
+    }
+    sql += ` ORDER BY RANDOM() LIMIT 1`;
 
-        const recipe = db.prepare(`SELECT * FROM recipes ${where} ORDER BY RANDOM() LIMIT 1`).get(...params);
+    db.get(sql, params, (err, recipe) => {
+        if (err) {
+            console.error('随机推荐失败:', err);
+            return res.status(500).json({ error: '服务器错误' });
+        }
         if (!recipe) {
-            return res.status(404).json({ error: 'No recipe found' });
+            return res.status(404).json({ error: '没有找到符合条件的菜谱' });
         }
-
-        const ingredients = db.prepare(
-            `SELECT i.id, i.name, i.category, i.calories, ri.quantity, ri.unit
-             FROM recipe_ingredients ri
-             JOIN ingredients i ON i.id = ri.ingredient_id
-             WHERE ri.recipe_id = ?`
-        ).all(recipe.id);
-
-        const steps = recipe.steps ? recipe.steps.split('\n').filter(s => s.trim()) : [];
-
-        res.json({
-            id: recipe.id,
-            name: recipe.name,
-            cuisine: recipe.cuisine,
-            flavor: recipe.flavor,
-            difficulty: recipe.difficulty,
-            duration: recipe.duration,
-            cost: recipe.cost,
-            season: recipe.season,
-            steps,
-            ingredients
-        });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+        res.json(recipe);
+    });
 });
 
+// ============================================================
+// POST /api/recommend/by-ingredients - 基于食材推荐
+// ============================================================
 router.post('/recommend/by-ingredients', (req, res) => {
-    try {
-        const { ingredients } = req.body;
-        if (!ingredients || !ingredients.trim()) {
-            return res.status(400).json({ error: 'ingredients is required' });
+    let ingredients = req.body.ingredients;
+
+    if (!ingredients) {
+        return res.status(400).json({ error: '请提供食材列表' });
+    }
+
+    if (typeof ingredients === 'string') {
+        ingredients = ingredients.split(/[,，\s]+/);
+    }
+
+    if (!Array.isArray(ingredients)) {
+        return res.status(400).json({ error: 'ingredients 格式错误，应为数组或字符串' });
+    }
+
+    const cleaned = [];
+    for (let i = 0; i < ingredients.length; i++) {
+        const item = ingredients[i];
+        if (item !== null && item !== undefined && typeof item === 'string') {
+            const trimmed = item.trim();
+            if (trimmed !== '') {
+                cleaned.push(trimmed);
+            }
+        }
+    }
+
+    if (cleaned.length === 0) {
+        return res.status(400).json({ error: '未检测到有效食材名称' });
+    }
+
+    const placeholders = cleaned.map(() => '?').join(',');
+
+    const sql = `
+        SELECT
+            r.id,
+            r.name,
+            r.cuisine,
+            r.flavor,
+            r.difficulty,
+            r.duration,
+            r.cost,
+            r.season,
+            r.steps,
+            GROUP_CONCAT(DISTINCT i.name) as all_ingredients,
+            GROUP_CONCAT(DISTINCT CASE WHEN i.name IN (${placeholders}) THEN i.name ELSE NULL END) as matched_names
+        FROM recipes r
+        JOIN recipe_ingredients ri ON r.id = ri.recipe_id
+        JOIN ingredients i ON ri.ingredient_id = i.id
+        GROUP BY r.id
+        HAVING matched_names IS NOT NULL AND matched_names != ''
+        ORDER BY LENGTH(matched_names) - LENGTH(REPLACE(matched_names, ',', '')) DESC
+    `;
+
+    db.all(sql, cleaned, (err, rows) => {
+        if (err) {
+            console.error('搜索食材错误:', err);
+            return res.status(500).json({ error: '数据库查询失败' });
         }
 
-        const list = ingredients.split(',').map(s => s.trim()).filter(Boolean);
-        if (list.length === 0) {
-            return res.status(400).json({ error: 'At least one ingredient is required' });
+        if (!rows || rows.length === 0) {
+            return res.json([]);
         }
 
-        const placeholders = list.map(() => '?').join(',');
-        const rows = db.prepare(
-            `SELECT DISTINCT r.id, r.name, r.cuisine, r.flavor, r.difficulty, r.duration, r.cost, r.season
-             FROM recipes r
-             JOIN recipe_ingredients ri ON ri.recipe_id = r.id
-             JOIN ingredients i ON i.id = ri.ingredient_id
-             WHERE i.name IN (${placeholders})
-             ORDER BY r.id`
-        ).all(...list);
+        const result = rows.map(row => {
+            const matched = row.matched_names ? row.matched_names.split(',') : [];
+            const all = row.all_ingredients ? row.all_ingredients.split(',') : [];
+            const missing = all.filter(name => matched.indexOf(name) === -1);
+            return {
+                id: row.id,
+                name: row.name,
+                cuisine: row.cuisine,
+                flavor: row.flavor,
+                difficulty: row.difficulty,
+                duration: row.duration,
+                cost: row.cost,
+                season: row.season,
+                steps: row.steps ? row.steps.split(';') : [],
+                matchedIngredients: matched,
+                missingIngredients: missing
+            };
+        });
 
-        res.json({ recipes: rows });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-router.get('/recommend/history/:userId', (req, res) => {
-    try {
-        const { userId } = req.params;
-        const days = parseInt(req.query.days, 10) || 30;
-
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - days);
-        const cutoffStr = cutoff.toISOString().split('T')[0];
-
-        const rows = db.prepare(
-            `SELECT rh.id, rh.recipe_id, rh.recommend_date, rh.is_adopted, r.name AS recipe_name
-             FROM recommend_history rh
-             JOIN recipes r ON r.id = rh.recipe_id
-             WHERE rh.user_id = ? AND rh.recommend_date >= ?
-             ORDER BY rh.recommend_date DESC, rh.id DESC`
-        ).all(userId, cutoffStr);
-
-        res.json({ records: rows });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+        res.json(result);
+    });
 });
 
 module.exports = router;

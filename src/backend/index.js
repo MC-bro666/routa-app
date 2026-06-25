@@ -5,7 +5,9 @@ const path = require('path');
 
 const authRoutes = require('./routes/auth');
 const preferencesRoutes = require('./routes/preferences');
+delete require.cache[require.resolve('./routes/recommend')];
 const recommendRoutes = require('./routes/recommend');
+console.log('recommendRoutes 内容:', recommendRoutes);
 const recipesRoutes = require('./routes/recipes');
 const feedbackRoutes = require('./routes/feedback');
 const historyRoutes = require('./routes/history');
@@ -21,6 +23,9 @@ app.use(express.static(path.join(__dirname, '..', 'frontend')));
 app.use('/api', authRoutes);
 app.use('/api', preferencesRoutes);
 app.use('/api', recommendRoutes);
+app.get('/api/test3', (req, res) => {
+    res.json({ message: '直接从 index.js 挂载的测试路由' });
+});
 app.use('/api', recipesRoutes);
 app.use('/api', feedbackRoutes);
 app.use('/api', historyRoutes);

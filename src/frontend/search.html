@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>食材搜索 - 智能菜谱推荐</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 左侧边栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">🍽️ 智能菜谱</div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item">📋 每日推荐</a>
+                <a href="search.html" class="nav-item active">🔍 食材搜索</a>
+                <a href="history.html" class="nav-item">📖 历史记录</a>
+            </nav>
+            <div class="sidebar-footer">
+                <span id="sidebarUser"></span>
+                <button id="logoutBtn" class="logout-btn">退出</button>
+            </div>
+        </aside>
+
+        <!-- 右侧内容 -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1>🔍 基于食材推荐</h1>
+                <p>输入你手头的食材，系统帮你找能做的菜</p>
+            </div>
+
+            <div class="search-section">
+                <div class="search-box">
+                    <input type="text" id="ingredientInput" placeholder="输入食材，用逗号分隔，如：番茄,鸡蛋">
+                    <button id="searchBtn">搜索</button>
+                </div>
+            </div>
+
+            <div id="searchResults" class="recipe-grid">
+                <!-- 搜索结果卡片渲染到这里 -->
+            </div>
+        </main>
+    </div>
+
+    <!-- 菜谱详情弹窗 -->
+    <div id="recipeModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        // 页面加载时检查登录状态
+        document.addEventListener('DOMContentLoaded', function() {
+            const token = getToken();
+            if (!token) {
+                window.location.href = 'login.html';
+                return;
+            }
+            // 显示用户名
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            document.getElementById('sidebarUser').textContent = user.username || '用户';
+
+            // 退出登录
+            document.getElementById('logoutBtn').addEventListener('click', function() {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = 'login.html';
+            });
+
+            // 搜索按钮
+            document.getElementById('searchBtn').addEventListener('click', searchByIngredients);
+            document.getElementById('ingredientInput').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') searchByIngredients();
+            });
+        });
+
+        function searchByIngredients() {
+            const input = document.getElementById('ingredientInput').value.trim();
+            if (!input) {
+                alert('请输入食材');
+                return;
+            }
+            const token = getToken();
+            if (!token) { window.location.href = 'login.html'; return; }
+
+            const ingredients = input.split(/[,，\s]+/).filter(i => i);
+            const container = document.getElementById('searchResults');
+            container.innerHTML = '<div class="loading">搜索中...</div>';
+
+            apiRequest('/api/recommend/by-ingredients', {
+                method: 'POST',
+                body: JSON.stringify({ ingredients })
+            }).then(data => {
+                if (data.error) {
+                    container.innerHTML = `<div class="empty-state">${data.error}</div>`;
+                    return;
+                }
+                if (!data.length) {
+                    container.innerHTML = '<div class="empty-state">😅 没有找到匹配的菜谱，试试其他食材吧</div>';
+                    return;
+                }
+                container.innerHTML = data.map(recipe => `
+                    <div class="recipe-card" onclick="showRecipeDetail(${recipe.id})">
+                        <h3>${recipe.name}</h3>
+                        <div class="recipe-tags">
+                            <span>${recipe.cuisine || '未知菜系'}</span>
+                            <span>${recipe.flavor || '未标注口味'}</span>
+                            <span>难度：${'⭐'.repeat(recipe.difficulty === 'easy' ? 1 : recipe.difficulty === 'medium' ? 2 : 3)}</span>
+                        </div>
+                        <div class="recipe-meta">
+                            <span>⏱ ${recipe.duration || '?'}分钟</span>
+                            <span>💰 ${recipe.cost || '未标注'}</span>
+                        </div>
+                        <div class="recipe-match">
+                            <span>匹配食材：${(recipe.matchedIngredients || []).join('、')}</span>
+                            <span class="missing">缺少：${(recipe.missingIngredients || []).join('、')}</span>
+                        </div>
+                        <button class="btn-detail" onclick="event.stopPropagation();showRecipeDetail(${recipe.id})">查看详情</button>
+                    </div>
+                `).join('');
+            }).catch(err => {
+                container.innerHTML = `<div class="empty-state">请求失败：${err.message}</div>`;
+            });
+        }
+    </script>
+</body>
+</html>

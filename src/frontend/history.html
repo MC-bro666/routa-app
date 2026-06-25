@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>历史记录 - 智能菜谱推荐</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 左侧边栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">🍽️ 智能菜谱</div>
+            <nav class="sidebar-nav">
+                <a href="index.html" class="nav-item">📋 每日推荐</a>
+                <a href="search.html" class="nav-item">🔍 食材搜索</a>
+                <a href="history.html" class="nav-item active">📖 历史记录</a>
+            </nav>
+            <div class="sidebar-footer">
+                <span id="sidebarUser"></span>
+                <button id="logoutBtn" class="logout-btn">退出</button>
+            </div>
+        </aside>
+
+        <!-- 右侧内容 -->
+        <main class="main-content">
+            <div class="page-header">
+                <h1>📖 我的历史记录</h1>
+                <p>你吃过和推荐的菜谱都在这里</p>
+            </div>
+
+            <div id="historyList">
+                <div class="loading">加载中...</div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 菜谱详情弹窗 -->
+    <div id="recipeModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const token = getToken();
+            if (!token) {
+                window.location.href = 'login.html';
+                return;
+            }
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            document.getElementById('sidebarUser').textContent = user.username || '用户';
+
+            document.getElementById('logoutBtn').addEventListener('click', function() {
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = 'login.html';
+            });
+
+            loadHistory();
+        });
+
+        function loadHistory() {
+            const container = document.getElementById('historyList');
+            const token = getToken();
+            if (!token) { window.location.href = 'login.html'; return; }
+
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.id) { container.innerHTML = '<div class="empty-state">未找到用户信息</div>'; return; }
+
+            apiRequest(`/api/history/${user.id}`)
+                .then(data => {
+                    if (data.error) {
+                        container.innerHTML = `<div class="empty-state">${data.error}</div>`;
+                        return;
+                    }
+                    if (!data || data.length === 0) {
+                        container.innerHTML = '<div class="empty-state">📭 还没有历史记录，快去探索美食吧！</div>';
+                        return;
+                    }
+                    // 按日期分组
+                    const groups = {};
+                    data.forEach(item => {
+                        const date = item.recommend_date || '未知日期';
+                        if (!groups[date]) groups[date] = [];
+                        groups[date].push(item);
+                    });
+
+                    let html = '';
+                    const today = new Date().toISOString().slice(0,10);
+                    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0,10);
+
+                    Object.keys(groups).sort((a,b) => b.localeCompare(a)).forEach(date => {
+                        let label = date;
+                        if (date === today) label = '今天';
+                        else if (date === yesterday) label = '昨天';
+                        else label = date;
+                        html += `<div class="history-group"><h3>${label}</h3>`;
+                        groups[date].forEach(item => {
+                            const status = item.is_adopted ? '✅ 已吃' : '⏳ 待品尝';
+                            html += `
+                                <div class="history-item" onclick="showRecipeDetail(${item.recipe_id})">
+                                    <span class="history-name">${item.recipe_name || '未知菜谱'}</span>
+                                    <span class="history-status">${status}</span>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                    });
+                    container.innerHTML = html;
+                })
+                .catch(err => {
+                    container.innerHTML = `<div class="empty-state">加载失败：${err.message}</div>`;
+                });
+        }
+    </script>
+</body>
+</html>

@@ -1,109 +1,893 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>智能菜谱推荐</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能菜谱推荐系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #faf8f6;
+            color: #3d2c1e;
+        }
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+        .sidebar {
+            width: 220px;
+            min-height: 100vh;
+            background: #f5f0eb;
+            border-right: 1px solid #e0d6cc;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            padding: 24px 0 16px 0;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+        }
+        .sidebar-brand {
+            font-size: 20px;
+            font-weight: 700;
+            padding: 0 20px 20px 20px;
+            color: #e8734a;
+            border-bottom: 1px solid #e0d6cc;
+            margin-bottom: 16px;
+        }
+        .sidebar-nav {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 0 12px;
+        }
+        .nav-item {
+            padding: 12px 16px;
+            border-radius: 8px;
+            color: #5a4a3a;
+            font-size: 15px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            text-align: left;
+            width: 100%;
+            font-weight: 500;
+        }
+        .nav-item:hover {
+            background: #e8ddd2;
+        }
+        .nav-item.active {
+            background: #e8734a;
+            color: #fff;
+        }
+        .sidebar-footer {
+            padding: 16px 20px;
+            border-top: 1px solid #e0d6cc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            color: #5a4a3a;
+            margin-top: auto;
+        }
+        .logout-btn {
+            background: none;
+            border: none;
+            color: #e8734a;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .logout-btn:hover {
+            text-decoration: underline;
+        }
+        .main-content {
+            flex: 1;
+            padding: 30px 40px;
+            background: #faf8f6;
+            overflow-y: auto;
+            min-height: 100vh;
+        }
+        .page-content {
+            display: none;
+        }
+        .page-content.active {
+            display: block;
+        }
+        .page-header h1 {
+            font-size: 26px;
+            color: #3d2c1e;
+            margin-bottom: 4px;
+        }
+        .page-header p {
+            color: #8a7a6a;
+            font-size: 15px;
+            margin-bottom: 20px;
+        }
+        .header-actions {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .btn-primary {
+            background: #e8734a;
+            color: #fff;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .btn-primary:hover {
+            background: #d4623a;
+        }
+        .btn-random {
+            background: #f0e6dc;
+            color: #5a4a3a;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+        .btn-random:hover {
+            background: #e0d6cc;
+        }
+        .recipe-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 20px;
+        }
+        .recipe-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            cursor: pointer;
+            border: 1px solid #f0ebe6;
+            transition: transform 0.2s;
+        }
+        .recipe-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        }
+        .recipe-card h3 {
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #3d2c1e;
+        }
+        .recipe-tags {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        .recipe-tags span {
+            background: #f5f0eb;
+            padding: 2px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            color: #5a4a3a;
+        }
+        .recipe-meta {
+            display: flex;
+            gap: 16px;
+            font-size: 14px;
+            color: #8a7a6a;
+            margin-bottom: 12px;
+        }
+        .btn-detail {
+            background: none;
+            border: 1px solid #e8734a;
+            color: #e8734a;
+            padding: 6px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .btn-detail:hover {
+            background: #e8734a;
+            color: #fff;
+        }
+        .empty-state,
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: #8a7a6a;
+            font-size: 16px;
+        }
+        .search-section {
+            margin-bottom: 24px;
+        }
+        .search-box {
+            display: flex;
+            gap: 12px;
+            max-width: 600px;
+        }
+        .search-box input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0d6cc;
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+        }
+        .search-box input:focus {
+            border-color: #e8734a;
+        }
+        .search-box button {
+            background: #e8734a;
+            color: #fff;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .search-box button:hover {
+            background: #d4623a;
+        }
+        .recipe-match {
+            font-size: 14px;
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+        .recipe-match .match {
+            color: #2d8a4e;
+        }
+        .recipe-match .missing {
+            color: #c0392b;
+        }
+        .history-group {
+            margin-bottom: 24px;
+        }
+        .history-group h3 {
+            font-size: 18px;
+            color: #3d2c1e;
+            border-bottom: 1px solid #e0d6cc;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+        }
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: #fff;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            border: 1px solid #f0ebe6;
+        }
+        .history-item:hover {
+            background: #f5f0eb;
+        }
+        .history-status {
+            font-size: 14px;
+            color: #5a4a3a;
+        }
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: #fff;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 640px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        .modal-close {
+            position: absolute;
+            top: 16px;
+            right: 20px;
+            font-size: 28px;
+            cursor: pointer;
+            color: #8a7a6a;
+            line-height: 1;
+        }
+        .modal-close:hover {
+            color: #3d2c1e;
+        }
+        .recipe-detail-tags {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        .recipe-detail-tags span {
+            background: #f5f0eb;
+            padding: 4px 14px;
+            border-radius: 12px;
+            font-size: 13px;
+            color: #5a4a3a;
+        }
+        .ingredient-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0 16px;
+        }
+        .ingredient-table th,
+        .ingredient-table td {
+            padding: 8px 12px;
+            border: 1px solid #e0d6cc;
+            text-align: left;
+            font-size: 14px;
+        }
+        .ingredient-table th {
+            background: #f5f0eb;
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 180px;
+                padding: 16px 0;
+            }
+            .main-content {
+                padding: 16px;
+            }
+            .recipe-grid {
+                grid-template-columns: 1fr;
+            }
+            .search-box {
+                flex-direction: column;
+            }
+        }
+        @media (max-width: 480px) {
+            .app-container {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                min-height: auto;
+                height: auto;
+                position: static;
+                flex-direction: row;
+                flex-wrap: wrap;
+                padding: 12px 16px;
+                border-right: none;
+                border-bottom: 1px solid #e0d6cc;
+            }
+            .sidebar-brand {
+                border-bottom: none;
+                padding: 0 16px 0 0;
+                margin-bottom: 0;
+                font-size: 16px;
+                display: flex;
+                align-items: center;
+            }
+            .sidebar-nav {
+                flex-direction: row;
+                padding: 0;
+                gap: 4px;
+                flex: 1;
+                flex-wrap: wrap;
+            }
+            .nav-item {
+                padding: 6px 12px;
+                font-size: 13px;
+                width: auto;
+            }
+            .sidebar-footer {
+                border-top: none;
+                padding: 0 0 0 12px;
+                margin-top: 0;
+                font-size: 13px;
+            }
+            .main-content {
+                padding: 12px;
+                min-height: auto;
+            }
+            .page-header h1 {
+                font-size: 20px;
+            }
+            .modal-content {
+                padding: 20px;
+                width: 95%;
+            }
+        }
+    </style>
 </head>
 <body>
-  <nav class="navbar">
-    <div class="nav-left">
-      <span class="logo">🍽️ 智能菜谱推荐</span>
-      <div class="nav-links">
-        <a class="nav-link active" data-view="home" id="navHome">首页</a>
-        <a class="nav-link" data-view="history" id="navHistory">📋 历史记录</a>
-      </div>
-    </div>
-    <div class="nav-right">
-      <span class="username" id="usernameDisplay"></span>
-      <button class="btn-logout" id="logoutBtn">退出</button>
-    </div>
-  </nav>
 
-  <div class="modal-overlay" id="modalOverlay" style="display:none;">
-    <div class="modal-dialog" id="modalDialog">
-      <button class="modal-close" id="modalClose">&times;</button>
-      <div id="modalBody">
-        <div id="modalLoading" class="modal-loading">加载中...</div>
-        <div id="modalContent" style="display:none;">
-          <h2 id="recipeName" class="recipe-detail-title"></h2>
-          <div class="recipe-tags" id="recipeTags"></div>
-          <div class="recipe-meta" id="recipeMeta"></div>
-
-          <h3 class="section-title">食材</h3>
-          <ul class="ingredient-list" id="ingredientList"></ul>
-
-          <h3 class="section-title">步骤</h3>
-          <ol class="step-list" id="stepList"></ol>
-
-          <h3 class="section-title">用户评价</h3>
-          <div class="feedback-form" id="feedbackForm">
-            <div class="star-rating" id="starRating">
-              <span class="star" data-value="1">★</span>
-              <span class="star" data-value="2">★</span>
-              <span class="star" data-value="3">★</span>
-              <span class="star" data-value="4">★</span>
-              <span class="star" data-value="5">★</span>
+    <div class="app-container">
+        <!-- 左侧边栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">🍽️ 智能菜谱</div>
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-page="daily">📋 每日推荐</button>
+                <button class="nav-item" data-page="search">🔍 食材搜索</button>
+                <button class="nav-item" data-page="history">📖 历史记录</button>
+            </nav>
+            <div class="sidebar-footer">
+                <span id="sidebarUser">用户</span>
+                <button id="logoutBtn" class="logout-btn">退出</button>
             </div>
-            <textarea class="feedback-textarea" id="feedbackComment" placeholder="写下你的评价..." rows="3"></textarea>
-            <button class="btn-submit-feedback" id="submitFeedback">提交评价</button>
-            <p class="feedback-login-hint" id="feedbackLoginHint" style="display:none;">请先登录后再评价</p>
-          </div>
-          <div class="feedback-list" id="feedbackList"></div>
+        </aside>
 
-          <div class="modal-actions">
-            <button class="btn-random-switch" id="randomSwitchBtn">🎲 换一道</button>
-          </div>
-        </div>
-      </div>
+        <!-- 右侧内容 -->
+        <main class="main-content">
+            <!-- 每日推荐 -->
+            <div id="dailyPage" class="page-content active">
+                <div class="page-header">
+                    <h1>📋 今日推荐</h1>
+                    <p>根据你的偏好和营养需求，为你精选的菜谱</p>
+                </div>
+                <div class="header-actions">
+                    <button id="getRecommendBtn" class="btn-primary">🔄 获取今日推荐</button>
+                    <button id="randomExploreBtn" class="btn-random">🎲 随便吃点</button>
+                </div>
+                <div id="recommendResults" class="recipe-grid">
+                    <div class="empty-state">点击「获取今日推荐」开始</div>
+                </div>
+            </div>
+
+            <!-- 食材搜索 -->
+            <div id="searchPage" class="page-content" style="display:none;">
+                <div class="page-header">
+                    <h1>🔍 基于食材推荐</h1>
+                    <p>输入你手头的食材，系统帮你找能做的菜</p>
+                </div>
+                <div class="search-section">
+                    <div class="search-box">
+                        <input type="text" id="ingredientInput" placeholder="输入食材，用逗号分隔，如：番茄,鸡蛋">
+                        <button id="searchBtn">搜索</button>
+                    </div>
+                </div>
+                <div id="searchResults" class="recipe-grid">
+                    <div class="empty-state">输入食材后点击搜索</div>
+                </div>
+            </div>
+
+            <!-- 历史记录 -->
+            <div id="historyPage" class="page-content" style="display:none;">
+                <div class="page-header">
+                    <h1>📖 我的历史记录</h1>
+                    <p>你吃过和推荐的菜谱都在这里</p>
+                </div>
+                <div id="historyList">
+                    <div class="empty-state">加载中...</div>
+                </div>
+            </div>
+        </main>
     </div>
-  </div>
 
-  <main class="container">
-    <section class="recommend-header">
-      <h1>今日推荐</h1>
-      <p class="date" id="dateDisplay"></p>
-      <div class="header-actions">
-        <button class="btn-primary" id="fetchRecommendBtn">获取今日推荐</button>
-        <button class="btn-random" id="randomExploreBtn">🎲 随便吃点</button>
-      </div>
-    </section>
+    <!-- 弹窗 -->
+    <div id="recipeModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <div id="modalBody"></div>
+        </div>
+    </div>
 
-    <section class="ingredient-search">
-      <h2 class="ingredient-search-title">🔍 基于食材推荐</h2>
-      <div class="ingredient-search-box">
-        <input type="text" class="ingredient-input" id="ingredientInput" placeholder="输入食材，用逗号分隔，如：番茄,鸡蛋" />
-        <button class="btn-primary" id="ingredientSearchBtn">搜索</button>
-      </div>
-    </section>
+    <script>
+        // ============================================================
+        // 工具函数
+        // ============================================================
+        function getToken() {
+            return localStorage.getItem('token');
+        }
 
-    <section class="loading" id="loadingIndicator" style="display: none;">
-      <div class="spinner"></div>
-      <p>正在为你智能推荐菜谱...</p>
-    </section>
+        function getUser() {
+            try {
+                var data = JSON.parse(localStorage.getItem('user') || '{}');
+                if (data && data.id && data.username) {
+                    return data;
+                }
+                return null;
+            } catch (e) {
+                return null;
+            }
+        }
 
-    <section class="error" id="errorDisplay" style="display: none;">
-      <p id="errorMessage"></p>
-    </section>
+        function apiRequest(url, options) {
+            var token = getToken();
+            var headers = {
+                'Content-Type': 'application/json'
+            };
+            if (token) {
+                headers['Authorization'] = 'Bearer ' + token;
+            }
 
-    <section class="card-grid" id="cardGrid"></section>
+            // 确保使用完整地址
+            var fullUrl = 'http://localhost:3001' + url;
 
-    <section class="history-section" id="historySection" style="display:none;">
-      <h1 class="history-title">📋 我的历史记录</h1>
-      <div id="historyLoading" class="loading" style="display:none;">
-        <div class="spinner"></div>
-        <p>加载中...</p>
-      </div>
-      <div id="historyContent"></div>
-    </section>
-  </main>
+            console.log('🔵 apiRequest 请求:', fullUrl);
 
-  <script>
-    if (!localStorage.getItem('token')) {
-      window.location.href = 'login.html';
-    }
-  </script>
-  <script src="app.js"></script>
+            return fetch(fullUrl, {
+                method: options && options.method ? options.method : 'GET',
+                headers: headers,
+                body: options && options.body ? options.body : undefined
+            })
+            .then(function(res) {
+                console.log('🟢 响应状态:', res.status);
+                // 检查是否是 JSON
+                var contentType = res.headers.get('content-type') || '';
+                if (contentType.indexOf('application/json') === -1) {
+                    return res.text().then(function(text) {
+                        console.error('🔴 返回的不是 JSON:', text.substring(0, 300));
+                        throw new Error('服务器返回了 HTML，可能是路由错误');
+                    });
+                }
+                return res.json();
+            });
+        }
+
+        // ============================================================
+        // 导航切换
+        // ============================================================
+        function navigateTo(page) {
+            console.log('导航到:', page);
+            var pages = document.querySelectorAll('.page-content');
+            for (var i = 0; i < pages.length; i++) {
+                pages[i].style.display = 'none';
+                pages[i].classList.remove('active');
+            }
+            var target = document.getElementById(page + 'Page');
+            if (target) {
+                target.style.display = 'block';
+                target.classList.add('active');
+            }
+            var items = document.querySelectorAll('.nav-item');
+            for (var j = 0; j < items.length; j++) {
+                items[j].classList.remove('active');
+                if (items[j].getAttribute('data-page') === page) {
+                    items[j].classList.add('active');
+                }
+            }
+            if (page === 'history') {
+                loadHistory();
+            }
+        }
+
+        // ============================================================
+        // 每日推荐
+        // ============================================================
+        function loadDailyRecommendation() {
+            console.log('loadDailyRecommendation 开始');
+            var container = document.getElementById('recommendResults');
+            if (!container) {
+                console.warn('recommendResults 不存在');
+                return;
+            }
+            var user = getUser();
+            console.log('当前用户:', user);
+            if (!user || !user.id) {
+                container.innerHTML = '<div class="empty-state">请先登录</div>';
+                return;
+            }
+            container.innerHTML = '<div class="loading">加载中...</div>';
+            apiRequest('/api/recommend/daily/' + user.id)
+                .then(function(data) {
+                    console.log('推荐数据:', data);
+                    if (data.error) {
+                        container.innerHTML = '<div class="empty-state">' + data.error + '</div>';
+                        return;
+                    }
+                    if (!data.recipes || data.recipes.length === 0) {
+                        container.innerHTML = '<div class="empty-state">暂无推荐结果，请设置偏好后重试</div>';
+                        return;
+                    }
+                    var html = '';
+                    for (var i = 0; i < data.recipes.length; i++) {
+                        var r = data.recipes[i];
+                        var stars = r.difficulty === 'easy' ? '⭐' : r.difficulty === 'medium' ? '⭐⭐' : '⭐⭐⭐';
+                        html += '<div class="recipe-card" onclick="showRecipeDetail(' + r.id + ')">';
+                        html += '<h3>' + r.name + '</h3>';
+                        html += '<div class="recipe-tags"><span>' + (r.cuisine || '未知菜系') + '</span><span>' + (r.flavor || '未标注口味') + '</span><span>难度：' + stars + '</span></div>';
+                        html += '<div class="recipe-meta"><span>⏱ ' + (r.duration || '?') + '分钟</span><span>💰 ' + (r.cost || '未标注') + '</span></div>';
+                        html += '<button class="btn-detail" onclick="event.stopPropagation();showRecipeDetail(' + r.id + ')">查看详情</button>';
+                        html += '</div>';
+                    }
+                    container.innerHTML = html;
+                })
+                .catch(function(err) {
+                    console.error('推荐请求失败:', err);
+                    container.innerHTML = '<div class="empty-state">请求失败：' + err.message + '</div>';
+                });
+        }
+
+        // ============================================================
+        // 随机探索
+        // ============================================================
+        function fetchRandomRecipe() {
+            console.log('随机探索');
+            apiRequest('/api/recommend/random')
+                .then(function(data) {
+                    if (data.error) {
+                        alert(data.error);
+                        return;
+                    }
+                    showRecipeDetail(data.id);
+                })
+                .catch(function(err) {
+                    alert('随机推荐失败：' + err.message);
+                });
+        }
+
+        // ============================================================
+        // 食材搜索
+        // ============================================================
+        function handleSearch() {
+            console.log('handleSearch 开始');
+            var input = document.getElementById('ingredientInput');
+            var container = document.getElementById('searchResults');
+            if (!input || !container) {
+                console.warn('搜索元素不存在');
+                return;
+            }
+            var text = input.value.trim();
+            if (!text) {
+                alert('请输入食材');
+                return;
+            }
+            var ingredients = text.split(/[,，\s]+/).filter(function(i) { return i; });
+            console.log('搜索食材:', ingredients);
+            container.innerHTML = '<div class="loading">搜索中...</div>';
+            apiRequest('/api/recommend/by-ingredients', {
+                method: 'POST',
+                body: JSON.stringify({ ingredients: ingredients })
+            })
+            .then(function(data) {
+                console.log('搜索结果:', data);
+                if (data.error) {
+                    container.innerHTML = '<div class="empty-state">' + data.error + '</div>';
+                    return;
+                }
+                if (!data || data.length === 0) {
+                    container.innerHTML = '<div class="empty-state">😅 没有找到匹配的菜谱</div>';
+                    return;
+                }
+                var html = '';
+                for (var i = 0; i < data.length; i++) {
+                    var r = data[i];
+                    var matched = r.matchedIngredients || [];
+                    var missing = r.missingIngredients || [];
+                    html += '<div class="recipe-card" onclick="showRecipeDetail(' + r.id + ')">';
+                    html += '<h3>' + r.name + '</h3>';
+                    html += '<div class="recipe-tags"><span>' + (r.cuisine || '未知菜系') + '</span><span>' + (r.flavor || '未标注口味') + '</span></div>';
+                    html += '<div class="recipe-match"><span class="match">✅ 已有：' + (matched.join('、') || '无') + '</span><span class="missing">❌ 缺少：' + (missing.join('、') || '已齐全') + '</span></div>';
+                    html += '<button class="btn-detail" onclick="event.stopPropagation();showRecipeDetail(' + r.id + ')">查看详情</button>';
+                    html += '</div>';
+                }
+                container.innerHTML = html;
+            })
+            .catch(function(err) {
+                console.error('搜索失败:', err);
+                container.innerHTML = '<div class="empty-state">请求失败：' + err.message + '</div>';
+            });
+        }
+
+        // ============================================================
+        // 历史记录
+        // ============================================================
+        function loadHistory() {
+            console.log('loadHistory 开始');
+            var container = document.getElementById('historyList');
+            if (!container) {
+                console.warn('historyList 不存在');
+                return;
+            }
+            var user = getUser();
+            if (!user || !user.id) {
+                container.innerHTML = '<div class="empty-state">请先登录</div>';
+                return;
+            }
+            container.innerHTML = '<div class="loading">加载中...</div>';
+            apiRequest('/api/history/' + user.id)
+                .then(function(data) {
+                    console.log('历史数据:', data);
+                    if (data.error) {
+                        container.innerHTML = '<div class="empty-state">' + data.error + '</div>';
+                        return;
+                    }
+                    if (!data || data.length === 0) {
+                        container.innerHTML = '<div class="empty-state">📭 还没有历史记录</div>';
+                        return;
+                    }
+                    var groups = {};
+                    var today = new Date().toISOString().slice(0, 10);
+                    var yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+                    for (var i = 0; i < data.length; i++) {
+                        var item = data[i];
+                        var date = item.recommend_date || '未知日期';
+                        if (!groups[date]) groups[date] = [];
+                        groups[date].push(item);
+                    }
+                    var html = '';
+                    var keys = Object.keys(groups).sort(function(a, b) { return b.localeCompare(a); });
+                    for (var j = 0; j < keys.length; j++) {
+                        var date = keys[j];
+                        var label = date;
+                        if (date === today) label = '今天';
+                        else if (date === yesterday) label = '昨天';
+                        else label = date;
+                        html += '<div class="history-group"><h3>' + label + '</h3>';
+                        var items = groups[date];
+                        for (var k = 0; k < items.length; k++) {
+                            var item2 = items[k];
+                            var status = item2.is_adopted ? '✅ 已吃' : '⏳ 待品尝';
+                            html += '<div class="history-item" onclick="showRecipeDetail(' + item2.recipe_id + ')">';
+                            html += '<span class="history-name">' + (item2.recipe_name || '未知菜谱') + '</span>';
+                            html += '<span class="history-status">' + status + '</span>';
+                            html += '</div>';
+                        }
+                        html += '</div>';
+                    }
+                    container.innerHTML = html;
+                })
+                .catch(function(err) {
+                    console.error('历史加载失败:', err);
+                    container.innerHTML = '<div class="empty-state">加载失败：' + err.message + '</div>';
+                });
+        }
+
+        // ============================================================
+        // 菜谱详情弹窗
+        // ============================================================
+        function showRecipeDetail(recipeId) {
+            console.log('查看详情:', recipeId);
+            var modal = document.getElementById('recipeModal');
+            var body = document.getElementById('modalBody');
+            if (!modal || !body) return;
+            modal.style.display = 'flex';
+            body.innerHTML = '<div class="loading">加载中...</div>';
+            apiRequest('/api/recipes/' + recipeId)
+                .then(function(data) {
+                    if (data.error) {
+                        body.innerHTML = '<div class="empty-state">' + data.error + '</div>';
+                        return;
+                    }
+                    var steps = data.steps || [];
+                    var stepsHtml = '';
+                    for (var i = 0; i < steps.length; i++) {
+                        stepsHtml += '<li>' + steps[i] + '</li>';
+                    }
+                    var ingredients = data.ingredients || [];
+                    var ingHtml = '';
+                    for (var j = 0; j < ingredients.length; j++) {
+                        var ing = ingredients[j];
+                        ingHtml += '<tr><td>' + ing.name + '</td><td>' + ing.category + '</td><td>' + ing.quantity + ' ' + ing.unit + '</td><td>' + ing.calories + ' kcal</td></tr>';
+                    }
+                    var stars = data.difficulty === 'easy' ? '⭐' : data.difficulty === 'medium' ? '⭐⭐' : '⭐⭐⭐';
+                    body.innerHTML = '';
+                    body.innerHTML += '<h2>' + data.name + '</h2>';
+                    body.innerHTML += '<div class="recipe-detail-tags"><span>' + (data.cuisine || '未知菜系') + '</span><span>' + (data.flavor || '未标注口味') + '</span><span>难度：' + stars + '</span><span>⏱ ' + (data.duration || '?') + '分钟</span><span>💰 ' + (data.cost || '未标注') + '</span><span>' + (data.season || '全年') + '</span></div>';
+                    body.innerHTML += '<h4>📝 制作步骤</h4><ol>' + stepsHtml + '</ol>';
+                    body.innerHTML += '<h4>🥘 所需食材</h4><table class="ingredient-table"><tr><th>食材</th><th>分类</th><th>用量</th><th>热量</th></tr>' + ingHtml + '</table>';
+                    body.innerHTML += '<div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;"><button class="btn-primary" onclick="addToShoppingList(' + data.id + ')">🛒 加入购物清单</button></div>';
+                })
+                .catch(function(err) {
+                    body.innerHTML = '<div class="empty-state">加载失败：' + err.message + '</div>';
+                });
+        }
+
+        // ============================================================
+        // 购物清单
+        // ============================================================
+        function addToShoppingList(recipeId) {
+            var list = JSON.parse(localStorage.getItem('shoppingList') || '[]');
+            if (!list.includes(recipeId)) {
+                list.push(recipeId);
+                localStorage.setItem('shoppingList', JSON.stringify(list));
+                alert('✅ 已加入购物清单！');
+            } else {
+                alert('这道菜已在购物清单中');
+            }
+        }
+
+        // ============================================================
+        // 关闭弹窗
+        // ============================================================
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('modal-close') || e.target.id === 'recipeModal') {
+                document.getElementById('recipeModal').style.display = 'none';
+            }
+        });
+
+        // ============================================================
+        // 页面初始化（所有代码都在这里执行）
+        // ============================================================
+        (function() {
+            console.log('=== 页面初始化 ===');
+
+            // 检查登录状态
+            var user = getUser();
+            var token = getToken();
+            console.log('user:', user);
+            console.log('token:', token ? '存在' : '不存在');
+
+            if (!token || !user) {
+                console.log('未登录，跳转到 login.html');
+                window.location.href = 'login.html';
+                return;
+            }
+
+            // 显示用户名
+            var userEl = document.getElementById('sidebarUser');
+            if (userEl && user.username) {
+                userEl.textContent = user.username;
+            }
+
+            // 导航点击
+            var navItems = document.querySelectorAll('.nav-item');
+            for (var i = 0; i < navItems.length; i++) {
+                (function(index) {
+                    navItems[index].addEventListener('click', function(e) {
+                        var page = this.getAttribute('data-page');
+                        navigateTo(page);
+                    });
+                })(i);
+            }
+
+            // 获取推荐按钮
+            var recommendBtn = document.getElementById('getRecommendBtn');
+            if (recommendBtn) {
+                recommendBtn.addEventListener('click', function() {
+                    loadDailyRecommendation();
+                });
+            }
+
+            // 随机探索
+            var randomBtn = document.getElementById('randomExploreBtn');
+            if (randomBtn) {
+                randomBtn.addEventListener('click', function() {
+                    fetchRandomRecipe();
+                });
+            }
+
+            // 搜索按钮
+            var searchBtn = document.getElementById('searchBtn');
+            if (searchBtn) {
+                searchBtn.addEventListener('click', function() {
+                    handleSearch();
+                });
+            }
+
+            // 搜索回车
+            var searchInput = document.getElementById('ingredientInput');
+            if (searchInput) {
+                searchInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        handleSearch();
+                    }
+                });
+            }
+
+            // 退出按钮
+            var logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', function() {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    window.location.href = 'login.html';
+                });
+            }
+
+            // 默认加载推荐
+            loadDailyRecommendation();
+
+            console.log('=== 初始化完成 ===');
+        })();
+    </script>
+
 </body>
 </html>
